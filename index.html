@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>海運運費比較</title>
+<!-- 加到手機主畫面後像 App 一樣全螢幕開啟 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="海運運費">
+<meta name="theme-color" content="#0f1420">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230f1420'/%3E%3Ctext x='90' y='118' font-size='96' text-anchor='middle' fill='%234fb0ff'%3E%F0%9F%9A%A2%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%9A%A2%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0f1420; --card:#182233; --card2:#1f2b40; --line:#2b3a55;
+    --txt:#e8edf6; --mut:#93a1bd; --accent:#4fb0ff; --good:#43d17a;
+    --warn:#ffb84d; --bad:#ff6b6b; --chip:#243350;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--txt);
+    font:15px/1.5 -apple-system,"Segoe UI","Microsoft JhengHei",system-ui,sans-serif;
+    padding:16px; -webkit-text-size-adjust:100%;
+    padding-left:max(16px,env(safe-area-inset-left));
+    padding-right:max(16px,env(safe-area-inset-right));
+    padding-bottom:max(16px,env(safe-area-inset-bottom));
+  }
+  h1{font-size:20px; margin:0 0 4px}
+  .sub{color:var(--mut); font-size:13px; margin:0 0 16px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px}
+  .card h2{font-size:15px; margin:0 0 12px; color:var(--accent)}
+  label{display:block; font-size:12px; color:var(--mut); margin-bottom:4px}
+  input,select{
+    width:100%; background:var(--card2); border:1px solid var(--line); color:var(--txt);
+    border-radius:9px; padding:10px 10px; font-size:16px; outline:none;
+  }
+  input:focus,select:focus{border-color:var(--accent)}
+  input[type=checkbox]{width:auto}
+  .row{display:grid; gap:10px}
+  .globals{grid-template-columns:1fr 1fr}
+  button{
+    background:var(--accent); color:#04121f; border:0; border-radius:10px;
+    padding:11px 14px; font-size:15px; font-weight:600; cursor:pointer;
+  }
+  button.ghost{background:var(--chip); color:var(--txt); border:1px solid var(--line)}
+  button.mini{padding:6px 10px; font-size:13px}
+  .pkg{background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:10px}
+  .pkg .grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
+  .pkg .grid.wide{grid-template-columns:2fr 1fr}
+  .pkg-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px}
+  .pkg-head .t{font-size:13px; color:var(--mut)}
+  .chk{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--txt); margin-top:6px}
+  .chk label{margin:0; color:var(--txt); font-size:13px}
+
+  .result{border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:10px; background:var(--card2)}
+  .result.best{border-color:var(--good); box-shadow:0 0 0 1px var(--good) inset}
+  .result .top{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+  .result .name{font-weight:600}
+  .result .price{font-size:20px; font-weight:700; color:var(--good)}
+  .result .twd{font-size:13px; color:var(--mut)}
+  .badges{margin-top:6px; display:flex; flex-wrap:wrap; gap:6px}
+  .badge{font-size:11px; padding:2px 8px; border-radius:20px; background:var(--chip); color:var(--mut)}
+  .badge.tax{background:#1c3a2a; color:var(--good)}
+  .badge.notax{background:#3a2a1c; color:var(--warn)}
+  .badge.best{background:#1c3a2a; color:var(--good)}
+  .detail{margin-top:8px; font-size:12px; color:var(--mut); white-space:pre-wrap; line-height:1.7; display:none}
+  .detail.show{display:block}
+  .warn-list{margin-top:8px}
+  .warn{font-size:12px; color:var(--warn); margin-top:3px}
+  .toggle{font-size:12px; color:var(--accent); cursor:pointer; margin-top:6px; display:inline-block}
+  .foot{color:var(--mut); font-size:11.5px; line-height:1.7; margin-top:8px}
+  .foot b{color:var(--txt)}
+  .del{color:var(--bad); background:none; border:0; font-size:13px; cursor:pointer; padding:4px}
+  @media(max-width:520px){ .pkg .grid{grid-template-columns:repeat(2,1fr)} }
+</style>
+</head>
+<body>
+
+<h1>淘寶海運運費比較計算器</h1>
+<p class="sub">輸入貨物尺寸重量，一次比較各航運商的大件海運 / 海快 / 空運費用。價格單位 ¥（人民幣）。</p>
+
+<div class="card">
+  <h2>設定</h2>
+  <div class="row globals">
+    <div>
+      <label>匯率　¥1 = NT$</label>
+      <input id="fx" type="number" step="0.01" value="4.5" inputmode="decimal">
+    </div>
+    <div>
+      <label>空運貨型</label>
+      <select id="airType">
+        <option value="normal">普貨 (¥25/kg)</option>
+        <option value="special">特貨 (¥30/kg)</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>貨物明細</h2>
+  <div id="pkgs"></div>
+  <button class="ghost mini" id="addBtn">＋ 新增一件</button>
+</div>
+
+<div class="card">
+  <h2>運費比較</h2>
+  <div id="results"></div>
+  <div class="foot" id="notes"></div>
+</div>
+
+<div class="card">
+  <h2>計算說明與假設</h2>
+  <div class="foot">
+    <b>大件海運</b>：材積 = 長×寬×高(cm) ÷ 28317；材積費與重量費<b>取高者</b>。<br>
+    　最低消費 <b>¥400/票</b>；單件 &gt;100kg 加 ¥100 叉車費；木架加固 ¥35/件（可勾選）。包稅包清關派送到一樓。<br>
+    <b>海快</b>：材積重 = 長×寬×高 ÷ 6000。若材積重 &gt; 實重（泡貨）→ 計費重 = 材積重 + 實重的一半，否則用實重。<br>
+    　¥10/kg，<b>不包稅</b>，最低 5kg 起，全票不足 11kg 加 ¥18/票派送費。<br>
+    <b>空運</b>：材積公式同海快；泡貨同樣「材積重 + 實重一半」。普貨 ¥25/kg、特貨 ¥30/kg，全票不足 11kg 加 ¥18/票。<br>
+    <span style="color:var(--warn)">泡貨「加實重一半」與海快最低消費、¥18 派送費以「全票合計」判斷 — 屬個人推算，實際請以航運商量尺寸後明細為準。</span>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   航運商費率設定 —— 之後要加新的一家，複製一個物件放進 CARRIERS 即可。
+   sea = 大件海運 / express = 海快 / air = 空運。留 null 表示該家不提供。
+   ───────────────────────────────────────────────────────────── */
+const CARRIERS = [
+  {
+    id:'weixiao',
+    name:'Wei笑生活',
+    sea:{
+      divisor:28317, minCharge:400, forkliftFee:100, forkliftOverKg:100, frameFee:35,
+      taxIncluded:true,
+      categories:[
+        {id:1, name:'一類 普通沙發/實木家具',                         kg:5,  cai:23},
+        {id:2, name:'二類 帶石或玻璃餐桌/亞克力浴缸/水槽/垃圾桶/貨架', kg:6,  cai:28},
+        {id:3, name:'三類 PVC石塑地板/馬桶/門窗/石陶浴缸浴櫃/電動沙發',kg:7,  cai:36},
+        {id:4, name:'四類 鏡桿簾桿/梯子/地墊毯/電動升降桌/運動器材',   kg:8,  cai:43},
+        {id:5, name:'五類 熱水器/空調/洗衣機/烘乾機/油煙機/洗碗機',    kg:12, cai:55},
+        {id:6, name:'六類 智能馬桶',                                   kg:15, cai:60},
+      ]
+    },
+    express:{ divisor:6000, ratePerKg:10, minKg:5, smallFee:18, smallFeeUnderKg:11, taxIncluded:false },
+    air:{ divisor:6000, rateNormal:25, rateSpecial:30, smallFee:18, smallFeeUnderKg:11, taxIncluded:true },
+  },
+  /* 範例：新增一家時照這格式貼上並填值
+  { id:'other', name:'其他航運商',
+    sea:{ divisor:28317, minCharge:400, forkliftFee:100, forkliftOverKg:100, frameFee:35, taxIncluded:true,
+          categories:[{id:1,name:'一類',kg:5,cai:22}, ...] },
+    express:{ divisor:6000, ratePerKg:10, minKg:5, smallFee:18, smallFeeUnderKg:11, taxIncluded:false },
+    air:null,
+  },
+  */
+];
+
+/* ─── 狀態 ─── */
+let pkgId = 0;
+const pkgsEl = document.getElementById('pkgs');
+const resultsEl = document.getElementById('results');
+const notesEl = document.getElementById('notes');
+const fxEl = document.getElementById('fx');
+const airTypeEl = document.getElementById('airType');
+
+function catOptions(){
+  return CARRIERS[0].sea.categories
+    .map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+}
+
+function addPkg(data={}){
+  const id = ++pkgId;
+  const div = document.createElement('div');
+  div.className='pkg'; div.dataset.id=id;
+  div.innerHTML = `
+    <div class="pkg-head">
+      <span class="t">第 <span class="idx"></span> 件</span>
+      <button class="del" data-act="del">✕ 刪除</button>
+    </div>
+    <div class="grid wide" style="margin-bottom:8px">
+      <div><label>品名（選填）</label><input data-f="name" value="${data.name||''}" placeholder="例：實木餐桌"></div>
+      <div><label>數量</label><input data-f="qty" type="number" min="1" step="1" value="${data.qty||1}" inputmode="numeric"></div>
+    </div>
+    <div class="grid">
+      <div><label>長 cm</label><input data-f="l" type="number" min="0" step="0.1" value="${data.l||''}" inputmode="decimal"></div>
+      <div><label>寬 cm</label><input data-f="w" type="number" min="0" step="0.1" value="${data.w||''}" inputmode="decimal"></div>
+      <div><label>高 cm</label><input data-f="h" type="number" min="0" step="0.1" value="${data.h||''}" inputmode="decimal"></div>
+      <div><label>重量 kg</label><input data-f="kg" type="number" min="0" step="0.1" value="${data.kg||''}" inputmode="decimal"></div>
+    </div>
+    <div class="grid wide" style="margin-top:8px">
+      <div><label>海運類別</label><select data-f="cat">${catOptions()}</select></div>
+      <div style="display:flex;align-items:flex-end">
+        <span class="chk"><input type="checkbox" data-f="frame" id="frm${id}"><label for="frm${id}">木架加固 ¥35</label></span>
+      </div>
+    </div>`;
+  pkgsEl.appendChild(div);
+  div.querySelectorAll('input,select').forEach(el=>{
+    el.addEventListener('input', calc);
+    el.addEventListener('change', calc);
+  });
+  div.querySelector('[data-act=del]').addEventListener('click', ()=>{
+    if(pkgsEl.children.length>1){ div.remove(); reindex(); calc(); }
+  });
+  if(data.cat) div.querySelector('[data-f=cat]').value=data.cat;
+  reindex();
+}
+
+function reindex(){
+  [...pkgsEl.children].forEach((el,i)=> el.querySelector('.idx').textContent=i+1);
+}
+
+function readPkgs(){
+  return [...pkgsEl.children].map(el=>{
+    const g=f=>el.querySelector(`[data-f="${f}"]`);
+    return {
+      name:g('name').value.trim(),
+      qty:Math.max(1, +g('qty').value||1),
+      l:+g('l').value||0, w:+g('w').value||0, h:+g('h').value||0,
+      kg:+g('kg').value||0,
+      cat:+g('cat').value||1,
+      frame:g('frame').checked,
+    };
+  });
+}
+
+const money = n => '¥'+ n.toLocaleString('en-US',{maximumFractionDigits:1});
+const r1 = n => Math.round(n*10)/10;
+
+/* ─── 大件海運 ─── */
+function calcSea(carrier, pkgs){
+  const s=carrier.sea; if(!s) return null;
+  let sum=0; const lines=[]; const warns=[];
+  for(const p of pkgs){
+    if(!p.l||!p.w||!p.h||!p.kg) continue;
+    const cat=s.categories.find(c=>c.id===p.cat)||s.categories[0];
+    const cai=(p.l*p.w*p.h)/s.divisor;
+    const byKg=p.kg*cat.kg, byCai=cai*cat.cai;
+    let unit=Math.max(byKg,byCai);
+    const basis=byCai>=byKg?`材積 ${r1(cai)}材×¥${cat.cai}`:`重量 ${r1(p.kg)}kg×¥${cat.kg}`;
+    let extra='';
+    if(p.kg>s.forkliftOverKg){ unit+=s.forkliftFee; extra+=` +叉車¥${s.forkliftFee}`; }
+    if(p.frame){ unit+=s.frameFee; extra+=` +木架¥${s.frameFee}`; }
+    sum+=unit*p.qty;
+    lines.push(`• ${p.name||cat.name.slice(0,4)} ×${p.qty}：${basis}${extra} → ${money(unit)}${p.qty>1?` ×${p.qty}`:''}`);
+    if(p.l>300||p.w>200) warns.push(`「${p.name||'某件'}」長>3m或寬>2m，可能加收超長派送費（金額實報）`);
+  }
+  let note='';
+  if(sum>0 && sum<s.minCharge){ note=`未達最低消費，以 ¥${s.minCharge}/票計`; sum=s.minCharge; }
+  return {total:sum, taxIncluded:s.taxIncluded, lines, warns, note};
+}
+
+/* 泡貨計費重：材積重>實重時 = 材積重 + 實重/2，否則用實重 */
+function chargeWeight(l,w,h,kg,divisor){
+  const vol=(l*w*h)/divisor;
+  return vol>kg ? vol+kg/2 : kg;
+}
+
+/* ─── 海快 ─── */
+function calcExpress(carrier, pkgs){
+  const e=carrier.express; if(!e) return null;
+  let cw=0; const lines=[]; const warns=[];
+  for(const p of pkgs){
+    if(!p.kg) continue;
+    const w=chargeWeight(p.l,p.w,p.h,p.kg,e.divisor)*p.qty;
+    cw+=w;
+    const vol=(p.l*p.w*p.h)/e.divisor;
+    lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${r1(w)}kg${vol>p.kg?'（泡貨）':''}`);
+    if(p.w>100||p.h>100||p.l>150) warns.push(`「${p.name||'某件'}」超尺寸（寬高>1m或長>1.5m），台灣派送站可能加超長轉派費`);
+  }
+  const notes=[];
+  if(cw>0 && cw<e.minKg){ notes.push(`未滿${e.minKg}kg，按${e.minKg}kg計`); cw=e.minKg; }
+  let total=cw*e.ratePerKg;
+  if(cw>0 && cw<e.smallFeeUnderKg){ total+=e.smallFee; notes.push(`不足${e.smallFeeUnderKg}kg 加 ¥${e.smallFee}派送費`); }
+  lines.push(`合計計費重 ${r1(cw)}kg × ¥${e.ratePerKg}`);
+  return {total, taxIncluded:e.taxIncluded, lines, warns, note:notes.join('；')};
+}
+
+/* ─── 空運 ─── */
+function calcAir(carrier, pkgs, airType){
+  const a=carrier.air; if(!a) return null;
+  const rate = airType==='special'?a.rateSpecial:a.rateNormal;
+  let cw=0; const lines=[]; const warns=[];
+  for(const p of pkgs){
+    if(!p.kg) continue;
+    const w=chargeWeight(p.l,p.w,p.h,p.kg,a.divisor)*p.qty;
+    cw+=w;
+    const vol=(p.l*p.w*p.h)/a.divisor;
+    lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${r1(w)}kg${vol>p.kg?'（泡貨）':''}`);
+  }
+  const notes=[];
+  let total=cw*rate;
+  if(cw>0 && cw<a.smallFeeUnderKg){ total+=a.smallFee; notes.push(`不足${a.smallFeeUnderKg}kg 加 ¥${a.smallFee}派送費`); }
+  lines.push(`合計計費重 ${r1(cw)}kg × ¥${rate}（${airType==='special'?'特貨':'普貨'}）`);
+  return {total, taxIncluded:a.taxIncluded, lines, warns, note:notes.join('；')};
+}
+
+function calc(){
+  const pkgs=readPkgs();
+  const fx=+fxEl.value||0;
+  const airType=airTypeEl.value;
+  const hasData=pkgs.some(p=>p.kg>0 && p.l>0);
+
+  const rows=[];
+  for(const c of CARRIERS){
+    const sea=calcSea(c,pkgs);
+    const exp=calcExpress(c,pkgs);
+    const air=calcAir(c,pkgs,airType);
+    if(sea&&sea.total>0) rows.push({carrier:c.name, mode:'大件海運', ...sea});
+    if(exp&&exp.total>0) rows.push({carrier:c.name, mode:'海快',     ...exp});
+    if(air&&air.total>0) rows.push({carrier:c.name, mode:'空運',     ...air});
+  }
+
+  if(!hasData || rows.length===0){
+    resultsEl.innerHTML='<div class="foot">請輸入至少一件貨物的長寬高與重量。</div>';
+    notesEl.innerHTML=''; return;
+  }
+
+  const min=Math.min(...rows.map(r=>r.total));
+  rows.sort((a,b)=>a.total-b.total);
+
+  resultsEl.innerHTML = rows.map((r,i)=>{
+    const best = r.total===min;
+    const twd = fx>0 ? `≈ NT$ ${Math.round(r.total*fx).toLocaleString()}` : '';
+    const taxBadge = r.taxIncluded
+      ? '<span class="badge tax">包稅包清關</span>'
+      : '<span class="badge notax">不含稅</span>';
+    const detail = [...r.lines, r.note?('※ '+r.note):''].filter(Boolean).join('\n');
+    const warnHtml = r.warns.length ? '<div class="warn-list">'+r.warns.map(w=>`<div class="warn">⚠ ${w}</div>`).join('')+'</div>' : '';
+    return `
+    <div class="result ${best?'best':''}">
+      <div class="top">
+        <div><span class="name">${r.carrier}</span> · ${r.mode}</div>
+        <div style="text-align:right">
+          <div class="price">${money(r.total)}</div>
+          <div class="twd">${twd}</div>
+        </div>
+      </div>
+      <div class="badges">
+        ${best?'<span class="badge best">✓ 最便宜</span>':''}
+        ${taxBadge}
+      </div>
+      ${warnHtml}
+      <span class="toggle" data-i="${i}">明細 ▾</span>
+      <div class="detail" data-d="${i}">${detail}</div>
+    </div>`;
+  }).join('');
+
+  resultsEl.querySelectorAll('.toggle').forEach(t=>{
+    t.addEventListener('click',()=>{
+      const d=resultsEl.querySelector(`[data-d="${t.dataset.i}"]`);
+      d.classList.toggle('show');
+      t.textContent = d.classList.contains('show')?'明細 ▴':'明細 ▾';
+    });
+  });
+
+  const anyNoTax = rows.some(r=>!r.taxIncluded);
+  notesEl.innerHTML = anyNoTax
+    ? '※ 標「不含稅」者到台灣需另付進口稅金，與「包稅」項目直接比價前請留意。'
+    : '';
+}
+
+/* 初始化：放兩件方便試 */
+addPkg({name:'', qty:1});
+calc();
+document.getElementById('addBtn').addEventListener('click', ()=>{ addPkg(); calc(); });
+fxEl.addEventListener('input', calc);
+airTypeEl.addEventListener('change', calc);
+</script>
+</body>
+</html>
