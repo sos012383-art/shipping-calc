@@ -58,7 +58,14 @@
   .result.best{border-color:var(--good); box-shadow:0 0 0 1px var(--good) inset}
   .result .top{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
   .result .name{font-weight:600}
-  .result .price{font-size:20px; font-weight:700; color:var(--good)}
+  .result .price{font-size:22px; font-weight:700; color:var(--good); display:inline-block; padding:1px 6px; border-radius:7px}
+  /* 數字每次重算就閃一下＋輕彈，讓改匯率/尺寸的變化一眼看得到 */
+  @keyframes priceBump{
+    0%{ transform:scale(1); background:rgba(67,209,122,.45); }
+    35%{ transform:scale(1.15); background:rgba(67,209,122,.30); }
+    100%{ transform:scale(1); background:transparent; }
+  }
+  .result .price.pulse{ animation:priceBump .45s ease-out }
   .result .twd{font-size:13px; color:var(--mut)}
   .badges{margin-top:6px; display:flex; flex-wrap:wrap; gap:6px}
   .badge{font-size:11px; padding:2px 8px; border-radius:20px; background:var(--chip); color:var(--mut)}
@@ -335,7 +342,7 @@ function calc(){
       <div class="top">
         <div><span class="name">${r.carrier}</span> · ${r.mode}</div>
         <div style="text-align:right">
-          <div class="price">${priceMain}</div>
+          <div class="price pulse">${priceMain}</div>
           <div class="twd">${priceSub}</div>
         </div>
       </div>
