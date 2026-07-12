@@ -321,7 +321,10 @@ function calc(){
 
   resultsEl.innerHTML = rows.map((r,i)=>{
     const best = r.total===min;
-    const twd = fx>0 ? `≈ NT$ ${Math.round(r.total*fx).toLocaleString()}` : '';
+    // 台灣使用者以 NT$ 為主要金額；改匯率時大數字立即連動。¥ 為航運商原始報價，放小當參考。
+    const ntd = fx>0 ? `NT$ ${Math.round(r.total*fx).toLocaleString()}` : null;
+    const priceMain = ntd || money(r.total);
+    const priceSub  = ntd ? `${money(r.total)}（匯率 ${fx}）` : '';
     const taxBadge = r.taxIncluded
       ? '<span class="badge tax">包稅包清關</span>'
       : '<span class="badge notax">不含稅</span>';
@@ -332,8 +335,8 @@ function calc(){
       <div class="top">
         <div><span class="name">${r.carrier}</span> · ${r.mode}</div>
         <div style="text-align:right">
-          <div class="price">${money(r.total)}</div>
-          <div class="twd">${twd}</div>
+          <div class="price">${priceMain}</div>
+          <div class="twd">${priceSub}</div>
         </div>
       </div>
       <div class="badges">
