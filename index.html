@@ -120,7 +120,7 @@
 <div class="card">
   <h2>計算說明與假設</h2>
   <div class="foot">
-    <b>大件海運</b>：材積 = 長×寬×高(cm) ÷ 28317；材積費與重量費<b>取高者</b>。<br>
+    <b>大件海運</b>：材積 = 長×寬×高(cm) ÷ 28317（<b>四捨五入至小數第2位後計費</b>）；材積費與重量費<b>取高者</b>。立方米(m³) = 長×寬×高 ÷ 100萬，僅供參考。<br>
     　最低消費 <b>¥400/票</b>；單件 &gt;100kg 加 ¥100 叉車費；木架加固 ¥35/件（可勾選）。包稅包清關派送到一樓。<br>
     <b>海快</b>：材積重 = 長×寬×高 ÷ 6000。若材積重 &gt; 實重（泡貨）→ 計費重 = 材積重 + 實重的一半，否則用實重。<br>
     　¥10/kg，<b>不包稅</b>，最低 5kg 起，全票不足 11kg 加 ¥18/票派送費。<br>
@@ -233,25 +233,30 @@ function readPkgs(){
 
 const money = n => '¥'+ n.toLocaleString('en-US',{maximumFractionDigits:1});
 const r1 = n => Math.round(n*10)/10;
+const round2 = n => Math.round(n*100)/100;                       // 材積四捨五入到小數第2位
+const two = n => round2(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); // 固定顯示2位
+const cbmOf = (l,w,h) => round2((l*w*h)/1000000);                // 立方米（CBM）= 長寬高cm ÷ 100萬
 
 /* ─── 大件海運 ─── */
 function calcSea(carrier, pkgs){
   const s=carrier.sea; if(!s) return null;
-  let sum=0; const lines=[]; const warns=[];
+  let sum=0, totCai=0, totCbm=0; const lines=[]; const warns=[];
   for(const p of pkgs){
     if(!p.l||!p.w||!p.h||!p.kg) continue;
     const cat=s.categories.find(c=>c.id===p.cat)||s.categories[0];
-    const cai=(p.l*p.w*p.h)/s.divisor;
+    const cai=round2((p.l*p.w*p.h)/s.divisor);   // 材積四捨五入到第2位，並以此計費
+    const cbm=cbmOf(p.l,p.w,p.h);                 // 立方米
     const byKg=p.kg*cat.kg, byCai=cai*cat.cai;
     let unit=Math.max(byKg,byCai);
-    const basis=byCai>=byKg?`材積 ${r1(cai)}材×¥${cat.cai}`:`重量 ${r1(p.kg)}kg×¥${cat.kg}`;
+    const basis=byCai>=byKg?`材積 ${two(cai)}材×¥${cat.cai}`:`重量 ${r1(p.kg)}kg×¥${cat.kg}`;
     let extra='';
     if(p.kg>s.forkliftOverKg){ unit+=s.forkliftFee; extra+=` +叉車¥${s.forkliftFee}`; }
     if(p.frame){ unit+=s.frameFee; extra+=` +木架¥${s.frameFee}`; }
-    sum+=unit*p.qty;
-    lines.push(`• ${p.name||cat.name.slice(0,4)} ×${p.qty}：${basis}${extra} → ${money(unit)}${p.qty>1?` ×${p.qty}`:''}`);
+    sum+=unit*p.qty; totCai+=cai*p.qty; totCbm+=cbm*p.qty;
+    lines.push(`• ${p.name||cat.name.slice(0,4)} ×${p.qty}：${basis}　[${two(cai)}材／${two(cbm)}m³]${extra} → ${money(unit)}${p.qty>1?` ×${p.qty}`:''}`);
     if(p.l>300||p.w>200) warns.push(`「${p.name||'某件'}」長>3m或寬>2m，可能加收超長派送費（金額實報）`);
   }
+  if(sum>0) lines.unshift(`合計材積 ${two(totCai)} 材 ／ ${two(totCbm)} m³（立方）`);
   let note='';
   if(sum>0 && sum<s.minCharge){ note=`未達最低消費，以 ¥${s.minCharge}/票計`; sum=s.minCharge; }
   return {total:sum, taxIncluded:s.taxIncluded, lines, warns, note};
@@ -259,27 +264,28 @@ function calcSea(carrier, pkgs){
 
 /* 泡貨計費重：材積重>實重時 = 材積重 + 實重/2，否則用實重 */
 function chargeWeight(l,w,h,kg,divisor){
-  const vol=(l*w*h)/divisor;
-  return vol>kg ? vol+kg/2 : kg;
+  const vol=round2((l*w*h)/divisor);   // 材積重四捨五入到第2位
+  return vol>kg ? round2(vol+kg/2) : kg;
 }
 
 /* ─── 海快 ─── */
 function calcExpress(carrier, pkgs){
   const e=carrier.express; if(!e) return null;
-  let cw=0; const lines=[]; const warns=[];
+  let cw=0, totCbm=0; const lines=[]; const warns=[];
   for(const p of pkgs){
     if(!p.kg) continue;
-    const w=chargeWeight(p.l,p.w,p.h,p.kg,e.divisor)*p.qty;
+    const w=round2(chargeWeight(p.l,p.w,p.h,p.kg,e.divisor)*p.qty);
     cw+=w;
-    const vol=(p.l*p.w*p.h)/e.divisor;
-    lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${r1(w)}kg${vol>p.kg?'（泡貨）':''}`);
+    const cbm=cbmOf(p.l,p.w,p.h); totCbm+=cbm*p.qty;
+    const vol=round2((p.l*p.w*p.h)/e.divisor);
+    lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${two(w)}kg${vol>p.kg?'（泡貨）':''}　[${two(cbm)}m³]`);
     if(p.w>100||p.h>100||p.l>150) warns.push(`「${p.name||'某件'}」超尺寸（寬高>1m或長>1.5m），台灣派送站可能加超長轉派費`);
   }
   const notes=[];
   if(cw>0 && cw<e.minKg){ notes.push(`未滿${e.minKg}kg，按${e.minKg}kg計`); cw=e.minKg; }
   let total=cw*e.ratePerKg;
   if(cw>0 && cw<e.smallFeeUnderKg){ total+=e.smallFee; notes.push(`不足${e.smallFeeUnderKg}kg 加 ¥${e.smallFee}派送費`); }
-  lines.push(`合計計費重 ${r1(cw)}kg × ¥${e.ratePerKg}`);
+  if(cw>0) lines.push(`合計計費重 ${two(cw)}kg × ¥${e.ratePerKg}　（立方合計 ${two(totCbm)} m³）`);
   return {total, taxIncluded:e.taxIncluded, lines, warns, note:notes.join('；')};
 }
 
@@ -287,18 +293,19 @@ function calcExpress(carrier, pkgs){
 function calcAir(carrier, pkgs, airType){
   const a=carrier.air; if(!a) return null;
   const rate = airType==='special'?a.rateSpecial:a.rateNormal;
-  let cw=0; const lines=[]; const warns=[];
+  let cw=0, totCbm=0; const lines=[]; const warns=[];
   for(const p of pkgs){
     if(!p.kg) continue;
-    const w=chargeWeight(p.l,p.w,p.h,p.kg,a.divisor)*p.qty;
+    const w=round2(chargeWeight(p.l,p.w,p.h,p.kg,a.divisor)*p.qty);
     cw+=w;
-    const vol=(p.l*p.w*p.h)/a.divisor;
-    lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${r1(w)}kg${vol>p.kg?'（泡貨）':''}`);
+    const cbm=cbmOf(p.l,p.w,p.h); totCbm+=cbm*p.qty;
+    const vol=round2((p.l*p.w*p.h)/a.divisor);
+    lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${two(w)}kg${vol>p.kg?'（泡貨）':''}　[${two(cbm)}m³]`);
   }
   const notes=[];
   let total=cw*rate;
   if(cw>0 && cw<a.smallFeeUnderKg){ total+=a.smallFee; notes.push(`不足${a.smallFeeUnderKg}kg 加 ¥${a.smallFee}派送費`); }
-  lines.push(`合計計費重 ${r1(cw)}kg × ¥${rate}（${airType==='special'?'特貨':'普貨'}）`);
+  if(cw>0) lines.push(`合計計費重 ${two(cw)}kg × ¥${rate}（${airType==='special'?'特貨':'普貨'}）　（立方合計 ${two(totCbm)} m³）`);
   return {total, taxIncluded:a.taxIncluded, lines, warns, note:notes.join('；')};
 }
 
