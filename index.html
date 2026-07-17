@@ -80,6 +80,18 @@
   .foot{color:var(--mut); font-size:11.5px; line-height:1.7; margin-top:8px}
   .foot b{color:var(--txt)}
   .del{color:var(--bad); background:none; border:0; font-size:13px; cursor:pointer; padding:4px}
+  /* 打木架區塊 */
+  .crate{margin-top:10px; border-top:1px dashed var(--line); padding-top:9px}
+  .crate-inputs{margin-top:8px}
+  .crate-hint{font-size:12px; color:var(--warn); margin-top:7px; font-weight:600}
+  .pkg[data-imported]{border-color:var(--accent)}
+  /* 照片上傳 OCR */
+  .upload{margin-bottom:12px; padding:11px; background:var(--card2); border:1px dashed var(--line); border-radius:11px}
+  #ocrStatus{font-size:12px; color:var(--mut); margin-left:8px}
+  .unit-row{display:flex; gap:16px; align-items:center; font-size:13px; margin:10px 0 6px}
+  .unit-row .chk{margin-top:0}
+  #ocrRaw{white-space:pre-wrap; font-size:11px; color:var(--mut); max-height:150px; overflow:auto; background:var(--bg); padding:8px; border-radius:8px; margin-top:6px}
+  details summary{font-size:12px; color:var(--accent); cursor:pointer; margin-top:6px}
   @media(max-width:520px){ .pkg .grid{grid-template-columns:repeat(2,1fr)} }
 </style>
 </head>
@@ -107,6 +119,20 @@
 
 <div class="card">
   <h2>貨物明細</h2>
+  <div class="upload">
+    <input type="file" id="photo" accept="image/*" hidden>
+    <button class="ghost mini" id="photoBtn">📷 上傳裝箱單照片，自動填尺寸</button>
+    <span id="ocrStatus"></span>
+    <div id="importPanel" hidden>
+      <div class="unit-row">
+        <span>照片尺寸單位：</span>
+        <label class="chk"><input type="radio" name="unit" value="mm" checked> mm（毫米）</label>
+        <label class="chk"><input type="radio" name="unit" value="cm"> cm（公分）</label>
+      </div>
+      <details id="ocrRawWrap"><summary>辨識原文（可核對）</summary><pre id="ocrRaw"></pre></details>
+      <div class="foot">⚠ 自動辨識僅供輔助，請務必逐列核對長寬高與重量。</div>
+    </div>
+  </div>
   <div id="pkgs"></div>
   <button class="ghost mini" id="addBtn">＋ 新增一件</button>
 </div>
@@ -125,6 +151,8 @@
     <b>海快</b>：材積重 = 長×寬×高 ÷ 6000。若材積重 &gt; 實重（泡貨）→ 計費重 = 材積重 + 實重的一半，否則用實重。<br>
     　¥10/kg，<b>不包稅</b>，最低 5kg 起，全票不足 11kg 加 ¥18/票派送費。<br>
     <b>空運</b>：材積公式同海快；泡貨同樣「材積重 + 實重一半」。普貨 ¥25/kg、特貨 ¥30/kg，全票不足 11kg 加 ¥18/票。<br>
+    <b>🪵 打木架</b>：勾選後輸入框後長寬高各加幾 cm、每件加幾 kg（一般各 +10~15cm、每件 +5~10kg），系統以「打木架後的尺寸重量」重算運費。<br>
+    <b>📷 照片自動填</b>：上傳裝箱單照片，用瀏覽器內建 OCR 抓「長*寬*高」與重量自動填入（可切 mm/cm）。辨識為輔助、務必核對。<br>
     <span style="color:var(--warn)">泡貨「加實重一半」與海快最低消費、¥18 派送費以「全票合計」判斷 — 屬個人推算，實際請以航運商量尺寸後明細為準。</span>
   </div>
 </div>
@@ -200,12 +228,28 @@ function addPkg(data={}){
       <div style="display:flex;align-items:flex-end">
         <span class="chk"><input type="checkbox" data-f="frame" id="frm${id}"><label for="frm${id}">木架加固 ¥35</label></span>
       </div>
+    </div>
+    <div class="crate">
+      <span class="chk"><input type="checkbox" data-f="crate" id="cr${id}"><label for="cr${id}">🪵 打木架（框後尺寸/重量變大）</label></span>
+      <div class="crate-inputs" data-crate-inputs hidden>
+        <div class="grid">
+          <div><label>長 +cm</label><input data-f="dl" type="number" min="0" step="1" value="${data.dl??12}" inputmode="decimal"></div>
+          <div><label>寬 +cm</label><input data-f="dw" type="number" min="0" step="1" value="${data.dw??12}" inputmode="decimal"></div>
+          <div><label>高 +cm</label><input data-f="dh" type="number" min="0" step="1" value="${data.dh??12}" inputmode="decimal"></div>
+          <div><label>重 +kg</label><input data-f="dkg" type="number" min="0" step="0.5" value="${data.dkg??7}" inputmode="decimal"></div>
+        </div>
+        <div class="crate-hint" data-crate-hint></div>
+      </div>
     </div>`;
+  if(data.imported) div.dataset.imported='1';
   pkgsEl.appendChild(div);
   div.querySelectorAll('input,select').forEach(el=>{
     el.addEventListener('input', calc);
     el.addEventListener('change', calc);
   });
+  const crateChk=div.querySelector('[data-f=crate]'), crateBox=div.querySelector('[data-crate-inputs]');
+  crateChk.addEventListener('change', ()=>{ crateBox.hidden=!crateChk.checked; });
+  if(data.crate){ crateChk.checked=true; crateBox.hidden=false; }
   div.querySelector('[data-act=del]').addEventListener('click', ()=>{
     if(pkgsEl.children.length>1){ div.remove(); reindex(); calc(); }
   });
@@ -220,11 +264,19 @@ function reindex(){
 function readPkgs(){
   return [...pkgsEl.children].map(el=>{
     const g=f=>el.querySelector(`[data-f="${f}"]`);
+    const l0=+g('l').value||0, w0=+g('w').value||0, h0=+g('h').value||0, kg0=+g('kg').value||0;
+    const crate=g('crate').checked;
+    const dl=+g('dl').value||0, dw=+g('dw').value||0, dh=+g('dh').value||0, dkg=+g('dkg').value||0;
+    // 打木架後的有效尺寸/重量，所有寄法都以此計費
+    const l = crate? round2(l0+dl):l0, w = crate? round2(w0+dw):w0,
+          h = crate? round2(h0+dh):h0, kg = crate? round2(kg0+dkg):kg0;
+    const hintEl=el.querySelector('[data-crate-hint]');
+    if(hintEl) hintEl.textContent = (crate && (l0||w0||h0))
+      ? `打木架後：${round2(l)}×${round2(w)}×${round2(h)} cm，${round2(kg)} kg（以此計費）` : '';
     return {
       name:g('name').value.trim(),
       qty:Math.max(1, +g('qty').value||1),
-      l:+g('l').value||0, w:+g('w').value||0, h:+g('h').value||0,
-      kg:+g('kg').value||0,
+      l,w,h,kg, l0,w0,h0,kg0, crate,
       cat:+g('cat').value||1,
       frame:g('frame').checked,
     };
@@ -253,7 +305,7 @@ function calcSea(carrier, pkgs){
     if(p.kg>s.forkliftOverKg){ unit+=s.forkliftFee; extra+=` +叉車¥${s.forkliftFee}`; }
     if(p.frame){ unit+=s.frameFee; extra+=` +木架¥${s.frameFee}`; }
     sum+=unit*p.qty; totCai+=cai*p.qty; totCbm+=cbm*p.qty;
-    lines.push(`• ${p.name||cat.name.slice(0,4)} ×${p.qty}：${basis}　[${two(cai)}材／${two(cbm)}m³]${extra} → ${money(unit)}${p.qty>1?` ×${p.qty}`:''}`);
+    lines.push(`• ${p.name||cat.name.slice(0,4)} ×${p.qty}：${basis}　[${two(cai)}材／${two(cbm)}m³]${p.crate?' 🪵木架':''}${extra} → ${money(unit)}${p.qty>1?` ×${p.qty}`:''}`);
     if(p.l>300||p.w>200) warns.push(`「${p.name||'某件'}」長>3m或寬>2m，可能加收超長派送費（金額實報）`);
   }
   if(sum>0) lines.unshift(`合計材積 ${two(totCai)} 材 ／ ${two(totCbm)} m³（立方）`);
@@ -278,7 +330,7 @@ function calcExpress(carrier, pkgs){
     cw+=w;
     const cbm=cbmOf(p.l,p.w,p.h); totCbm+=cbm*p.qty;
     const vol=round2((p.l*p.w*p.h)/e.divisor);
-    lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${two(w)}kg${vol>p.kg?'（泡貨）':''}　[${two(cbm)}m³]`);
+    lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${two(w)}kg${vol>p.kg?'（泡貨）':''}${p.crate?' 🪵木架':''}　[${two(cbm)}m³]`);
     if(p.w>100||p.h>100||p.l>150) warns.push(`「${p.name||'某件'}」超尺寸（寬高>1m或長>1.5m），台灣派送站可能加超長轉派費`);
   }
   const notes=[];
@@ -300,7 +352,7 @@ function calcAir(carrier, pkgs, airType){
     cw+=w;
     const cbm=cbmOf(p.l,p.w,p.h); totCbm+=cbm*p.qty;
     const vol=round2((p.l*p.w*p.h)/a.divisor);
-    lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${two(w)}kg${vol>p.kg?'（泡貨）':''}　[${two(cbm)}m³]`);
+    lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${two(w)}kg${vol>p.kg?'（泡貨）':''}${p.crate?' 🪵木架':''}　[${two(cbm)}m³]`);
   }
   const notes=[];
   let total=cw*rate;
@@ -377,7 +429,87 @@ function calc(){
     : '';
 }
 
-/* 初始化：放兩件方便試 */
+/* ─── 照片 OCR 自動填尺寸 ─── */
+let lastParsed = [];
+const photoBtn=document.getElementById('photoBtn');
+const photoInput=document.getElementById('photo');
+const ocrStatus=document.getElementById('ocrStatus');
+const importPanel=document.getElementById('importPanel');
+
+photoBtn.addEventListener('click', ()=> photoInput.click());
+photoInput.addEventListener('change', async ()=>{
+  const file=photoInput.files[0]; if(!file) return;
+  ocrStatus.textContent='載入辨識引擎…';
+  try{
+    await ensureTesseract();
+    ocrStatus.textContent='辨識中…（首次較久）';
+    const { data:{ text } } = await Tesseract.recognize(file, 'eng', {
+      logger:m=>{ if(m.status==='recognizing text') ocrStatus.textContent=`辨識中… ${Math.round(m.progress*100)}%`; }
+    });
+    document.getElementById('ocrRaw').textContent=text;
+    lastParsed=parseDims(text);
+    importPanel.hidden=false;
+    if(lastParsed.length){
+      const maxv=Math.max(...lastParsed.flatMap(i=>[i.l,i.w,i.h]));
+      const unit=maxv>300?'mm':'cm';   // 值偏大多半是 mm
+      const radio=document.querySelector(`input[name=unit][value="${unit}"]`);
+      if(radio) radio.checked=true;
+      applyImport();
+      ocrStatus.textContent=`✓ 找到 ${lastParsed.length} 筆，已填入（請核對）`;
+    }else{
+      ocrStatus.textContent='沒抓到「長*寬*高」格式，請展開原文手動輸入';
+    }
+  }catch(err){
+    ocrStatus.textContent='辨識失敗：'+(err.message||err);
+  }finally{ photoInput.value=''; }
+});
+document.querySelectorAll('input[name=unit]').forEach(r=> r.addEventListener('change', applyImport));
+
+function ensureTesseract(){
+  if(window.Tesseract) return Promise.resolve();
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload=res; s.onerror=()=>rej(new Error('無法載入辨識引擎，請確認網路'));
+    document.head.appendChild(s);
+  });
+}
+/* 從辨識文字抓「A*B*C」尺寸與同列重量 */
+function parseDims(text){
+  const items=[];
+  // 分隔符放寬：OCR 常把 * 誤判成 % x X + ﹡ · • 等，一併視為乘號
+  const S='[*xX×╳%+﹡·•]';
+  const tri=new RegExp(`(\\d{1,4}(?:\\.\\d+)?)\\s*${S}\\s*(\\d{1,4}(?:\\.\\d+)?)\\s*${S}\\s*(\\d{1,4}(?:\\.\\d+)?)`);
+  for(const line of text.split(/\n/)){
+    const m=line.match(tri); if(!m) continue;
+    let kg=null;
+    const kgM=line.match(/(\d+(?:\.\d+)?)\s*(?:kg|KG|公斤|千克)/);
+    if(kgM) kg=+kgM[1];
+    else{ const after=line.slice(m.index+m[0].length).match(/(\d+(?:\.\d+)?)/); if(after) kg=+after[1]; }
+    items.push({l:+m[1], w:+m[2], h:+m[3], kg});
+  }
+  return items;
+}
+/* 依單位換算並填入（重跑會取代先前匯入的列，不重複） */
+function applyImport(){
+  if(!lastParsed.length) return;
+  const unit=(document.querySelector('input[name=unit]:checked')||{}).value||'mm';
+  const d= unit==='mm'?10:1;
+  pkgsEl.querySelectorAll('.pkg[data-imported]').forEach(el=>el.remove());
+  [...pkgsEl.children].forEach(el=>{
+    const v=f=>el.querySelector(`[data-f="${f}"]`).value;
+    if(!v('l')&&!v('w')&&!v('h')&&!v('kg')) el.remove();
+  });
+  lastParsed.forEach((it,i)=> addPkg({
+    imported:true, name:`照片#${i+1}`,
+    l:round2(it.l/d), w:round2(it.w/d), h:round2(it.h/d),
+    kg: it.kg!=null? it.kg : '', qty:1
+  }));
+  if(!pkgsEl.children.length) addPkg();
+  reindex(); calc();
+}
+
+/* 初始化：放一件方便試 */
 addPkg({name:'', qty:1});
 calc();
 document.getElementById('addBtn').addEventListener('click', ()=>{ addPkg(); calc(); });
