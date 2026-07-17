@@ -88,8 +88,8 @@
   /* 照片上傳 OCR */
   .upload{margin-bottom:12px; padding:11px; background:var(--card2); border:1px dashed var(--line); border-radius:11px}
   #ocrStatus{font-size:12px; color:var(--mut); margin-left:8px}
-  .unit-row{display:flex; gap:16px; align-items:center; font-size:13px; margin:10px 0 6px}
-  .unit-row .chk{margin-top:0}
+  .unit-row{display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; font-size:13px; margin:10px 0 6px}
+  .unit-row .chk{margin-top:0; white-space:nowrap}
   #ocrRaw{white-space:pre-wrap; font-size:11px; color:var(--mut); max-height:150px; overflow:auto; background:var(--bg); padding:8px; border-radius:8px; margin-top:6px}
   details summary{font-size:12px; color:var(--accent); cursor:pointer; margin-top:6px}
   @media(max-width:520px){ .pkg .grid{grid-template-columns:repeat(2,1fr)} }
@@ -152,7 +152,7 @@
     　¥10/kg，<b>不包稅</b>，最低 5kg 起，全票不足 11kg 加 ¥18/票派送費。<br>
     <b>空運</b>：材積公式同海快；泡貨同樣「材積重 + 實重一半」。普貨 ¥25/kg、特貨 ¥30/kg，全票不足 11kg 加 ¥18/票。<br>
     <b>🪵 打木架</b>：勾選後輸入框後長寬高各加幾 cm、每件加幾 kg（一般各 +10~15cm、每件 +5~10kg），系統以「打木架後的尺寸重量」重算運費。<br>
-    <b>📷 照片自動填</b>：上傳裝箱單照片，用瀏覽器內建 OCR 抓「長*寬*高」與重量自動填入（可切 mm/cm）。辨識為輔助、務必核對。<br>
+    <b>📷 照片自動填</b>：上傳裝箱單照片，用瀏覽器內建 OCR 自動填入（可切 mm/cm）。支援兩種格式：「長*寬*高」文字，與「體積/長/寬/高/重量」表格欄位。照片解析度低時小數點易誤判，辨識為輔助、務必逐列核對。<br>
     <span style="color:var(--warn)">泡貨「加實重一半」與海快最低消費、¥18 派送費以「全票合計」判斷 — 屬個人推算，實際請以航運商量尺寸後明細為準。</span>
   </div>
 </div>
@@ -441,13 +441,15 @@ photoInput.addEventListener('change', async ()=>{
   const file=photoInput.files[0]; if(!file) return;
   ocrStatus.textContent='載入辨識引擎…';
   try{
-    await ensureTesseract();
+    const worker=await ensureTesseract();
+    ocrStatus.textContent='影像強化中…';
+    const pre=await preprocess(file);        // 放大＋灰階＋拉對比，避免小數點被吃掉
     ocrStatus.textContent='辨識中…（首次較久）';
-    const { data:{ text } } = await Tesseract.recognize(file, 'eng', {
-      logger:m=>{ if(m.status==='recognizing text') ocrStatus.textContent=`辨識中… ${Math.round(m.progress*100)}%`; }
-    });
+    const { data:{ text } } = await worker.recognize(pre);
     document.getElementById('ocrRaw').textContent=text;
+    let mode='長*寬*高';
     lastParsed=parseDims(text);
+    if(!lastParsed.length){ lastParsed=parseTable(text); mode='表格欄位'; }  // 抓不到就退表格模式
     importPanel.hidden=false;
     if(lastParsed.length){
       const maxv=Math.max(...lastParsed.flatMap(i=>[i.l,i.w,i.h]));
@@ -455,9 +457,9 @@ photoInput.addEventListener('change', async ()=>{
       const radio=document.querySelector(`input[name=unit][value="${unit}"]`);
       if(radio) radio.checked=true;
       applyImport();
-      ocrStatus.textContent=`✓ 找到 ${lastParsed.length} 筆，已填入（請核對）`;
+      ocrStatus.textContent=`✓ 以「${mode}」模式找到 ${lastParsed.length} 筆，已填入（請逐列核對）`;
     }else{
-      ocrStatus.textContent='沒抓到「長*寬*高」格式，請展開原文手動輸入';
+      ocrStatus.textContent='沒抓到尺寸。請把表格拍大一點、裁掉無關區域再試，或展開原文對照手動輸入';
     }
   }catch(err){
     ocrStatus.textContent='辨識失敗：'+(err.message||err);
@@ -465,14 +467,43 @@ photoInput.addEventListener('change', async ()=>{
 });
 document.querySelectorAll('input[name=unit]').forEach(r=> r.addEventListener('change', applyImport));
 
-function ensureTesseract(){
-  if(window.Tesseract) return Promise.resolve();
-  return new Promise((res,rej)=>{
-    const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-    s.onload=res; s.onerror=()=>rej(new Error('無法載入辨識引擎，請確認網路'));
-    document.head.appendChild(s);
+let ocrWorker=null;
+async function ensureTesseract(){
+  if(ocrWorker) return ocrWorker;
+  if(!window.Tesseract){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      s.onload=res; s.onerror=()=>rej(new Error('無法載入辨識引擎，請確認網路'));
+      document.head.appendChild(s);
+    });
+  }
+  ocrWorker=await Tesseract.createWorker('eng',1,{
+    logger:m=>{ if(m.status==='recognizing text') ocrStatus.textContent=`辨識中… ${Math.round(m.progress*100)}%`; }
   });
+  await ocrWorker.setParameters({ preserve_interword_spaces:'1' });
+  return ocrWorker;
+}
+/* 影像前處理：低解析度截圖常讓 OCR 吃掉小數點——放大到寬約2000px＋灰階＋對比拉伸 */
+async function preprocess(file){
+  const img=await createImageBitmap(file);
+  const scale=Math.min(4, Math.max(1, 2000/img.width));
+  const c=document.createElement('canvas');
+  c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale);
+  const x=c.getContext('2d');
+  x.imageSmoothingEnabled=true; x.imageSmoothingQuality='high';
+  x.drawImage(img,0,0,c.width,c.height);
+  const d=x.getImageData(0,0,c.width,c.height), p=d.data;
+  let min=255,max=0;
+  for(let i=0;i<p.length;i+=4){ const g=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2]; if(g<min)min=g; if(g>max)max=g; }
+  const range=Math.max(1,max-min);
+  for(let i=0;i<p.length;i+=4){
+    let g=0.299*p[i]+0.587*p[i+1]+0.114*p[i+2];
+    g=(g-min)*255/range;
+    p[i]=p[i+1]=p[i+2]=g;
+  }
+  x.putImageData(d,0,0);
+  return new Promise(r=>c.toBlob(r,'image/png'));
 }
 /* 從辨識文字抓「A*B*C」尺寸與同列重量 */
 function parseDims(text){
@@ -487,6 +518,33 @@ function parseDims(text){
     if(kgM) kg=+kgM[1];
     else{ const after=line.slice(m.index+m[0].length).match(/(\d+(?:\.\d+)?)/); if(after) kg=+after[1]; }
     items.push({l:+m[1], w:+m[2], h:+m[3], kg});
+  }
+  return items;
+}
+/* 表格欄位模式：抓「(序號) (體積) 長 寬 高 重量」一列多欄的裝箱單。
+   OCR 常吃掉小數點（2125.00→212500、34.70→34700），依合理範圍修復。 */
+function fixDim(tok){                       // 尺寸：mm 合理上限 3000；無小數點且超出多半是掉了「.00」
+  let v=+tok;
+  if(!tok.includes('.')) while(v>3000) v/=100;
+  return round2(v);
+}
+function fixKg(tok){                        // 重量：單件合理上限 300kg；掉點多為 ×1000
+  if(tok==null) return null;
+  let v=+tok;
+  if(!tok.includes('.') && v>300){ v/=1000; if(v>300) v/=10; }
+  return round2(v);
+}
+function parseTable(text){
+  const items=[];
+  for(const line of text.split(/\n/)){
+    let toks=[...line.matchAll(/\d+(?:\.\d+)?/g)].map(m=>m[0]);
+    if(toks.length<4) continue;                                   // 至少 長寬高＋重量
+    if(toks.length>=5 && !toks[0].startsWith('0') && !toks[0].includes('.') && +toks[0]<100) toks=toks.slice(1); // 序號
+    if(toks.length>=5 && (toks[0].startsWith('0')||+toks[0]<20)) toks=toks.slice(1);                             // 體積(m³)欄
+    if(toks.length<3) continue;
+    const l=fixDim(toks[0]), w=fixDim(toks[1]), h=fixDim(toks[2]);
+    const kg=toks[3]!=null? fixKg(toks[3]) : null;
+    if([l,w,h].every(v=>v>=1&&v<=3000)) items.push({l,w,h,kg});
   }
   return items;
 }
