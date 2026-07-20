@@ -147,13 +147,13 @@
   <h2>計算說明與假設</h2>
   <div class="foot">
     <b>大件海運</b>：材積 = 長×寬×高(cm) ÷ 28317（<b>四捨五入至小數第2位後計費</b>）；材積費與重量費<b>取高者</b>。立方米(m³) = 長×寬×高 ÷ 100萬，僅供參考。<br>
-    　最低消費 <b>¥400/票</b>；單件 &gt;100kg 加 ¥100 叉車費；木架加固 ¥35/件（可勾選）。包稅包清關派送到一樓。<br>
+    　單件 &gt;100kg 加 ¥100 叉車費；木架加固 ¥35/件（可勾選）。包稅包清關派送到一樓。<b>低消 ¥400/票不計入價格</b>（可湊單跨過），未達時會提示。<br>
     <b>海快</b>：材積重 = 長×寬×高 ÷ 6000。若材積重 &gt; 實重（泡貨）→ 計費重 = 材積重 + 實重的一半，否則用實重。<br>
-    　¥10/kg，<b>不包稅</b>，最低 5kg 起，全票不足 11kg 加 ¥18/票派送費。<br>
+    　¥10/kg，<b>不包稅</b>，全票不足 11kg 加 ¥18/票派送費。<b>低消 5kg 不計入價格</b>（可湊單跨過），未滿時會提示。<br>
     <b>空運</b>：材積公式同海快；泡貨同樣「材積重 + 實重一半」。普貨 ¥25/kg、特貨 ¥30/kg，全票不足 11kg 加 ¥18/票。<br>
     <b>🪵 打木架</b>：勾選後輸入框後長寬高各加幾 cm、每件加幾 kg（一般各 +10~15cm、每件 +5~10kg），系統以「打木架後的尺寸重量」重算運費。<br>
     <b>📷 照片自動填</b>：上傳裝箱單照片，用瀏覽器內建 OCR 自動填入（可切 mm/cm）。支援兩種格式：「長*寬*高」文字，與「體積/長/寬/高/重量」表格欄位。照片解析度低時小數點易誤判，辨識為輔助、務必逐列核對。<br>
-    <span style="color:var(--warn)">泡貨「加實重一半」與海快最低消費、¥18 派送費以「全票合計」判斷 — 屬個人推算，實際請以航運商量尺寸後明細為準。</span>
+    <span style="color:var(--warn)">泡貨「加實重一半」與 ¥18 派送費、低消提示皆以「全票合計」判斷 — 屬個人推算，實際請以航運商量尺寸後明細為準。</span>
   </div>
 </div>
 
@@ -309,9 +309,9 @@ function calcSea(carrier, pkgs){
     if(p.l>300||p.w>200) warns.push(`「${p.name||'某件'}」長>3m或寬>2m，可能加收超長派送費（金額實報）`);
   }
   if(sum>0) lines.unshift(`合計材積 ${two(totCai)} 材 ／ ${two(totCbm)} m³（立方）`);
-  let note='';
-  if(sum>0 && sum<s.minCharge){ note=`未達最低消費，以 ¥${s.minCharge}/票計`; sum=s.minCharge; }
-  return {total:sum, taxIncluded:s.taxIncluded, lines, warns, note};
+  // 低消不灌入價格（可湊單跨過），僅提示
+  if(sum>0 && sum<s.minCharge) warns.push(`此票未達低消 ¥${s.minCharge}，單獨寄會被收 ¥${s.minCharge}——建議與其他貨湊單`);
+  return {total:sum, taxIncluded:s.taxIncluded, lines, warns, note:''};
 }
 
 /* 泡貨計費重：材積重>實重時 = 材積重 + 實重/2，否則用實重 */
@@ -334,7 +334,8 @@ function calcExpress(carrier, pkgs){
     if(p.w>100||p.h>100||p.l>150) warns.push(`「${p.name||'某件'}」超尺寸（寬高>1m或長>1.5m），台灣派送站可能加超長轉派費`);
   }
   const notes=[];
-  if(cw>0 && cw<e.minKg){ notes.push(`未滿${e.minKg}kg，按${e.minKg}kg計`); cw=e.minKg; }
+  // 低消不灌入價格（可湊單跨過），僅提示
+  if(cw>0 && cw<e.minKg) warns.push(`此票未滿 ${e.minKg}kg 低消，單獨寄會按 ${e.minKg}kg 計——建議與其他貨湊單`);
   let total=cw*e.ratePerKg;
   if(cw>0 && cw<e.smallFeeUnderKg){ total+=e.smallFee; notes.push(`不足${e.smallFeeUnderKg}kg 加 ¥${e.smallFee}派送費`); }
   if(cw>0) lines.push(`合計計費重 ${two(cw)}kg × ¥${e.ratePerKg}　（立方合計 ${two(totCbm)} m³）`);
