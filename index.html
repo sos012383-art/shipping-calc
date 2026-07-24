@@ -149,7 +149,7 @@
     <b>大件海運</b>：材積 = 長×寬×高(cm) ÷ 28317（<b>四捨五入至小數第2位後計費</b>）；材積費與重量費<b>取高者</b>。立方米(m³) = 長×寬×高 ÷ 100萬，僅供參考。<br>
     　單件 &gt;100kg 加 ¥100 叉車費；木架加固 ¥35/件（可勾選）。包稅包清關派送到一樓。<b>低消 ¥400/票不計入價格</b>（可湊單跨過），未達時會提示。<br>
     <b>海快</b>：材積重 = 長×寬×高 ÷ 6000。若材積重 &gt; 實重（泡貨）→ 計費重 = 材積重 + 實重的一半，否則用實重。<br>
-    　¥10/kg，<b>不包稅</b>，全票不足 11kg 加 ¥18/票派送費。<b>低消 5kg 不計入價格</b>（可湊單跨過），未滿時會提示。<br>
+    　Wei笑生活 ¥10/kg、淘寶極運 ¥9/kg，<b>不包稅</b>，全票不足 11kg 加 ¥18/票派送費。<b>低消 5kg 不計入價格</b>（可湊單跨過），未滿時會提示。超尺寸/重（寬高>1m、長>1.5m、Wei>40kg／極運>35kg）台灣派站可能加超長轉派費。<br>
     <b>空運</b>：材積公式同海快；泡貨同樣「材積重 + 實重一半」。普貨 ¥25/kg、特貨 ¥30/kg，全票不足 11kg 加 ¥18/票。<br>
     <b>🪵 打木架</b>：勾選後輸入框後長寬高各加幾 cm、每件加幾 kg（一般各 +10~15cm、每件 +5~10kg），系統以「打木架後的尺寸重量」重算運費。<br>
     <b>📷 照片自動填</b>：上傳裝箱單照片，用瀏覽器內建 OCR 自動填入（可切 mm/cm）。支援兩種格式：「長*寬*高」文字，與「體積/長/寬/高/重量」表格欄位。照片解析度低時小數點易誤判，辨識為輔助、務必逐列核對。<br>
@@ -178,8 +178,18 @@ const CARRIERS = [
         {id:6, name:'六類 智能馬桶',                                   kg:15, cai:60},
       ]
     },
-    express:{ divisor:6000, ratePerKg:10, minKg:5, smallFee:18, smallFeeUnderKg:11, taxIncluded:false },
+    express:{ divisor:6000, ratePerKg:10, minKg:5, smallFee:18, smallFeeUnderKg:11, taxIncluded:false,
+              maxW:100, maxH:100, maxL:150, overKg:40 },   // 超尺寸/重警示門檻：寬高>1m、長>1.5m、單件>40kg
     air:{ divisor:6000, rateNormal:25, rateSpecial:30, smallFee:18, smallFeeUnderKg:11, taxIncluded:true },
+  },
+  {
+    id:'jiyun',
+    name:'淘寶極運',
+    sea:null,
+    // 只有小件海快：¥9/kg、不包稅、最低5kg、不足11kg加¥18派送費、可湊單
+    express:{ divisor:6000, ratePerKg:9, minKg:5, smallFee:18, smallFeeUnderKg:11, taxIncluded:false,
+              maxW:100, maxH:100, maxL:150, overKg:35 },   // 超尺寸/重警示：寬高>1m、長>1.5m、單件>35kg
+    air:null,
   },
   /* 範例：新增一家時照這格式貼上並填值
   { id:'other', name:'其他航運商',
@@ -331,7 +341,8 @@ function calcExpress(carrier, pkgs){
     const cbm=cbmOf(p.l,p.w,p.h); totCbm+=cbm*p.qty;
     const vol=round2((p.l*p.w*p.h)/e.divisor);
     lines.push(`• ${p.name||'貨件'} ×${p.qty}：計費重 ${two(w)}kg${vol>p.kg?'（泡貨）':''}${p.crate?' 🪵木架':''}　[${two(cbm)}m³]`);
-    if(p.w>100||p.h>100||p.l>150) warns.push(`「${p.name||'某件'}」超尺寸（寬高>1m或長>1.5m），台灣派送站可能加超長轉派費`);
+    const mw=e.maxW||100, mh=e.maxH||100, ml=e.maxL||150, ok=e.overKg||0;
+    if(p.w>mw||p.h>mh||p.l>ml||(ok&&p.kg>ok)) warns.push(`「${p.name||'某件'}」超尺寸/重（寬高>1m或長>1.5m${ok?`或單件>${ok}kg`:''}），台灣派送站可能加超長轉派費`);
   }
   const notes=[];
   // 低消不灌入價格（可湊單跨過），僅提示
