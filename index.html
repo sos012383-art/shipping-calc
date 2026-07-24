@@ -7,16 +7,16 @@
 <!-- 加到手機主畫面後像 App 一樣全螢幕開啟 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="海運運費">
-<meta name="theme-color" content="#0f1420">
+<meta name="theme-color" content="#eef1f6">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230f1420'/%3E%3Ctext x='90' y='118' font-size='96' text-anchor='middle' fill='%234fb0ff'%3E%F0%9F%9A%A2%3C/text%3E%3C/svg%3E">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%9A%A2%3C/text%3E%3C/svg%3E">
 <style>
   :root{
-    --bg:#0f1420; --card:#182233; --card2:#1f2b40; --line:#2b3a55;
-    --txt:#e8edf6; --mut:#93a1bd; --accent:#4fb0ff; --good:#43d17a;
-    --warn:#ffb84d; --bad:#ff6b6b; --chip:#243350;
+    --bg:#eef1f6; --card:#ffffff; --card2:#f4f6fb; --line:#d6dde8;
+    --txt:#1b2431; --mut:#64708a; --accent:#1668c9; --good:#0d7c41;
+    --warn:#9a640f; --bad:#d63a3c; --chip:#e6ebf4;
   }
   *{box-sizing:border-box}
   body{
@@ -41,7 +41,7 @@
   .row{display:grid; gap:10px}
   .globals{grid-template-columns:1fr 1fr}
   button{
-    background:var(--accent); color:#04121f; border:0; border-radius:10px;
+    background:var(--accent); color:#fff; border:0; border-radius:10px;
     padding:11px 14px; font-size:15px; font-weight:600; cursor:pointer;
   }
   button.ghost{background:var(--chip); color:var(--txt); border:1px solid var(--line)}
@@ -61,17 +61,17 @@
   .result .price{font-size:22px; font-weight:700; color:var(--good); display:inline-block; padding:1px 6px; border-radius:7px}
   /* 數字每次重算就閃一下＋輕彈，讓改匯率/尺寸的變化一眼看得到 */
   @keyframes priceBump{
-    0%{ transform:scale(1); background:rgba(67,209,122,.45); }
-    35%{ transform:scale(1.15); background:rgba(67,209,122,.30); }
+    0%{ transform:scale(1); background:rgba(18,147,78,.28); }
+    35%{ transform:scale(1.15); background:rgba(18,147,78,.16); }
     100%{ transform:scale(1); background:transparent; }
   }
   .result .price.pulse{ animation:priceBump .45s ease-out }
   .result .twd{font-size:13px; color:var(--mut)}
   .badges{margin-top:6px; display:flex; flex-wrap:wrap; gap:6px}
   .badge{font-size:11px; padding:2px 8px; border-radius:20px; background:var(--chip); color:var(--mut)}
-  .badge.tax{background:#1c3a2a; color:var(--good)}
-  .badge.notax{background:#3a2a1c; color:var(--warn)}
-  .badge.best{background:#1c3a2a; color:var(--good)}
+  .badge.tax{background:#e2f4ea; color:var(--good)}
+  .badge.notax{background:#fbeede; color:var(--warn)}
+  .badge.best{background:#e2f4ea; color:var(--good)}
   .detail{margin-top:8px; font-size:12px; color:var(--mut); white-space:pre-wrap; line-height:1.7; display:none}
   .detail.show{display:block}
   .warn-list{margin-top:8px}
